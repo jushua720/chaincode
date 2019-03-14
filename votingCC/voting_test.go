@@ -92,4 +92,7 @@ func TestCCFunctions(test *testing.T) {
 	fmt.Println("= Register Candidate =")
 	Invoke(test, stub, "registerCandidate", "primary", userSSNs[0], userKeys[0])
 
+	fmt.Println("= Register Voter =")
+	Invoke(test, stub, "registerVoter", userSSNs[1], "primary")
+
 }

@@ -10,7 +10,7 @@ type User struct {
 	LastName         string `json:"LastName"`
 	DateOfBirth      string `json:"DateOfBirth"`
 	Gender           string `json:"Gender"`
-	VotingChoice     string `json:"VotingChoice"`
+	Election         string `json:"Election"`
 	RegistrationDate string `json:"RegistrationDate"`
 }
 
@@ -56,6 +56,18 @@ type NewCandidate struct {
 	ElectionType   string `json:"ElectionType"`
 	ElectionPeriod string `json:"ElectionPeriod"`
 	TxID           string `json:"TxID"`
+}
+
+type NewVoter struct {
+	SSN            string `json:"SSN"`
+	FirstName      string `json:"FirstName"`
+	LastName       string `json:"LastName"`
+	DateOfBirth    string `json:"DateOfBirth"`
+	Age            string `json:"Age"`
+	Eligibility    bool   `json:"EligibilityToVote"`
+	Candidate      bool   `json:"Candidate"`
+	ElectionType   string `json:"ElectionType"`
+	ElectionPeriod string `json"ElectionPeriod"`
 }
 
 type Result struct {

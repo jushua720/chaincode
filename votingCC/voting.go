@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -20,8 +22,6 @@ func (s *VotingChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	return shim.Success(nil)
 }
 
-// @dev: init - access control
-
 func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	function, args := stub.GetFunctionAndParameters()
@@ -38,6 +38,9 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	} else if function == "getUser" {
 		return s.getUser(stub, args)
+
+	} else if function == "getUserVotingHistory" {
+		return s.getUserVotingHistory(stub, args)
 	}
 
 	return shim.Error(msg.GetErrMsg("COM_ERR_11", []string{function}))
@@ -73,7 +76,7 @@ func (s *VotingChaincode) registerUser(stub shim.ChaincodeStubInterface, args []
 		return shim.Error(msg.GetErrMsg("VOT_ERR_03", []string{err.Error()}))
 	}
 
-	userAsBytes, _ := u.MarshalData(fmt.Sprintf(`{"SSN": "%s", "PublicKey":"%s","FirstName":"%s","LastName":"%s","DateOfBirth":"%s","Gender":"%s","VotingChoice":"%s","RegistrationDate":"%s"}`,
+	userAsBytes, _ := u.MarshalData(fmt.Sprintf(`{"SSN": "%s", "PublicKey":"%s","FirstName":"%s","LastName":"%s","DateOfBirth":"%s","Gender":"%s","Election":"%s","RegistrationDate":"%s"}`,
 		ssn, pubKey, args[1], args[2], args[3], gender, "", registrationDate), User{})
 
 	err = stub.PutState(pubKey, userAsBytes)
@@ -102,7 +105,6 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 	}
 
 	electionType := args[0]
-
 	electionID := args[1]
 	startDate := args[2]
 	endDate := args[3]
@@ -168,8 +170,6 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{ssn}))
 	}
 
-	// @dev - check if registrationPeriod is open
-
 	userAsBytes, err := stub.GetState(userPubKey)
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_10", []string{userPubKey, err.Error()}))
@@ -182,14 +182,11 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 		return shim.Error(msg.GetErrMsg("", []string{userPubKey, user.PublicKey}))
 	}
 
-	// @dev check candidate age
-
 	err = u.CreateCompKey(stub, c.CANDIDATE, []string{electionType, ssn})
 	if err != nil {
 		return shim.Error(err.Error())
 	}
 
-	// @optimize
 	_, keyParts, err := stub.SplitCompositeKey(election)
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
@@ -205,10 +202,85 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 }
 
 // args[0] : SSN
-// args[] : electionType
+// args[1] : electionType
 func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 2 {
+		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"registerVoter", "2"}))
+	}
 
-	return shim.Success(nil)
+	var isCandidate bool
+	ssn := args[0]
+	electionType := args[1]
+
+	found, userPubKey := u.FindUserBySSN(stub, ssn)
+	if !found {
+		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{ssn}))
+	}
+
+	userAsBytes, err := stub.GetState(userPubKey)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_10", []string{ssn, err.Error()}))
+	}
+
+	user := User{}
+	json.Unmarshal(userAsBytes, &user)
+
+	election, _ := u.FindCompositeKey(stub, c.ELECTION, []string{electionType})
+	if election == "" {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_07", []string{electionType}))
+	}
+
+	_, keyParts, err := stub.SplitCompositeKey(election)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
+	}
+
+	electionStartDate := keyParts[1]
+	electionEndDate := keyParts[2]
+
+	isRegistered := strings.Contains(user.Election, fmt.Sprint(c.REGISTERED+
+		c.SEPARATOR+electionType+c.SEPARATOR+electionStartDate+
+		c.SEPARATOR+electionEndDate))
+
+	if isRegistered == true {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_10", []string{ssn}))
+	}
+
+	age, isEligibleToVote := u.ValidateAge(user.DateOfBirth, "2006/01/02", electionStartDate, electionEndDate)
+
+	candidateCompKey := fmt.Sprintf("\x00" + c.CANDIDATE + "\x00" + electionType + "\x00" + ssn + "\x00")
+	candidateKeyAsBytes, _ := stub.GetState(candidateCompKey)
+
+	if candidateKeyAsBytes != nil {
+		isCandidate = true
+	}
+
+	electionInfo := fmt.Sprintf(c.REGISTERED +
+		c.SEPARATOR + electionType + c.SEPARATOR + electionStartDate +
+		c.SEPARATOR + electionEndDate +
+		c.SEPARATOR + strconv.FormatBool(isCandidate) +
+		c.SEPARATOR + age +
+		c.SEPARATOR + strconv.FormatBool(isEligibleToVote))
+
+	user.Election = electionInfo
+
+	userAsBytes, _ = json.Marshal(user)
+
+	err = stub.PutState(userPubKey, userAsBytes)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_09", []string{userPubKey, err.Error()}))
+	}
+
+	newVoter := NewVoter{
+		ssn,
+		user.FirstName, user.LastName,
+		user.DateOfBirth, age, isEligibleToVote,
+		isCandidate, electionType,
+		fmt.Sprint(electionStartDate + "-" + electionEndDate)}
+
+	newVoterJSON, _ := json.Marshal(newVoter)
+
+	return shim.Success(newVoterJSON)
 }
 
 // args[0]: search criteria [identity (ssn) / publickey]
@@ -239,7 +311,41 @@ func (s *VotingChaincode) getUser(stub shim.ChaincodeStubInterface, args []strin
 	}
 
 	return shim.Success(userAsBytes)
+}
 
+// args[0] : ssn
+func (s *VotingChaincode) getUserVotingHistory(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 1 {
+		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"getUserVotingHistory", "1"}))
+	}
+
+	ssn := args[0]
+
+	found, userPubKey := u.FindUserBySSN(stub, ssn)
+	if !found {
+		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{ssn}))
+	}
+
+	historyIterator, err := stub.GetHistoryForKey(userPubKey)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_19", []string{ssn, err.Error()}))
+	}
+
+	history := make([]User, 0)
+	for historyIterator.HasNext() {
+		record, err := historyIterator.Next()
+		if err != nil {
+			return shim.Error(msg.GetErrMsg("COM_ERR_13", []string{err.Error()}))
+		}
+		var user User
+
+		json.Unmarshal(record.Value, &user)
+		history = append(history, user)
+	}
+
+	historyAsBytes, _ := json.Marshal(&history)
+
+	return shim.Success(historyAsBytes)
 }
 
 func main() {

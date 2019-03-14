@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"time"
@@ -15,13 +16,37 @@ import (
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
-func IsWithinRange(dateToCheck string, startDate string, endDate string, dateFormat string) bool {
+func ValidateAge(dob, dateFormat, startDate, endDate string) (string, bool) {
+
+	isAdult := true
+	dateOfBirth, _ := time.Parse(dateFormat, dob)
+
+	age := time.Now().Year() - dateOfBirth.Year()
+	dobMonthDay, _ := strconv.Atoi(strconv.Itoa(int(dateOfBirth.Month())) + strconv.Itoa(dateOfBirth.Day()))
+	nowMonthDay, _ := strconv.Atoi(strconv.Itoa(int(time.Now().Month())) + strconv.Itoa(time.Now().Day()))
+
+	if dobMonthDay > nowMonthDay {
+		age = age - 1
+	}
+
+	adultYear := dateOfBirth.Year() + 18
+
+	adultDate, _ := time.Parse(dateFormat, strconv.Itoa(adultYear)+"/"+fmt.Sprintf("%02d", int(dateOfBirth.Month()))+"/"+strconv.Itoa(dateOfBirth.Day()))
+
+	if age < 18 {
+		isAdult = IsWithinRange(adultDate.Format(dateFormat), startDate, endDate, dateFormat)
+	}
+
+	return strconv.Itoa(age), isAdult
+}
+
+func IsWithinRange(dateToCheck, startDate, endDate, dateFormat string) bool {
 
 	date, _ := time.Parse(dateFormat, dateToCheck)
 	date1, _ := time.Parse(dateFormat, startDate)
 	date2, _ := time.Parse(dateFormat, endDate)
 
-	if date.Before(date2) && date.After(date1) {
+	if date.Before(date2) && date.After(date1) || dateToCheck == startDate || dateToCheck == endDate {
 		return true
 	}
 
@@ -105,8 +130,6 @@ func ConvertStrToInt(args []string) ([]int, error) {
 	return res, nil
 
 }
-
-//@note more reasonable to do Marshall in the function - here we play with interface properties
 
 func MarshalData(data string, dataStruct interface{}) ([]byte, error) {
 

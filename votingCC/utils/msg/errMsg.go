@@ -32,6 +32,7 @@ var errCodeMap = map[string]string{
 	"COM_ERR_17": "Error calling chaincode \"%s\" : %s",
 
 	"COM_ERR_18": "Invalid Argument \"%s\" : %s",
+	"COM_ERR_19": "Failed To Get History for \"%s\" : %s",
 
 	"VOT_ERR_01": "Duplicated SSN : \"%s\"",
 	"VOT_ERR_02": "Failed to Register New User : %s",

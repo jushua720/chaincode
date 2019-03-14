@@ -21,4 +21,11 @@ const (
 	USERKEY  = "userkey"
 )
 
+const (
+	REGISTERED = "registered"
+	VOTED      = "voted"
+)
+
+const SEPARATOR = "-"
+
 const Base58Table = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
