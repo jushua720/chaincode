@@ -26,6 +26,12 @@ const (
 	VOTED      = "voted"
 )
 
+// cc
+const (
+	CCNAME    = "elect_cc"
+	CHANNELID = "mychannel"
+)
+
 const SEPARATOR = "-"
 
 const Base58Table = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

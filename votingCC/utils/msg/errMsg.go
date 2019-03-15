@@ -44,6 +44,11 @@ var errCodeMap = map[string]string{
 	"VOT_ERR_08": "Keys mismatch: \"%s\"  and  \"%s\"",
 	"VOT_ERR_09": "Candidate is already registered : \"%s\"",
 	"VOT_ERR_10": "Voter \"%s\" is already registered",
+	"VOT_ERR_11": "Not allowed to Vote : %s",
+	"VOT_ERR_12": "Invalid Candidate \"%s\" : %s",
+	"VOT_ERR_13": "%s Not \"%s\" Election Period : %s",
+	"VOT_ERR_14": "%s Has Already Voted",
+	"VOT_ERR_15": "Election \"%s\" Not Exist",
 }
 
 func GetErrMsgParams(arr []string) []interface{} {

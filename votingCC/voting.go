@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -41,6 +42,8 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	} else if function == "getUserVotingHistory" {
 		return s.getUserVotingHistory(stub, args)
+	} else if function == "vote" {
+		return s.vote(stub, args)
 	}
 
 	return shim.Error(msg.GetErrMsg("COM_ERR_11", []string{function}))
@@ -105,6 +108,7 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 	}
 
 	electionType := args[0]
+
 	electionID := args[1]
 	startDate := args[2]
 	endDate := args[3]
@@ -118,7 +122,7 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 		return shim.Error(msg.GetErrMsg("VOT_ERR_05", []string{startDate, endDate}))
 	}
 
-	registeredElection, err := u.FindCompositeKey(stub, c.ELECTION, []string{})
+	registeredElection, err := u.FindCompositeKey(stub, c.ELECTION, []string{electionType})
 	if registeredElection != "" {
 		return shim.Error(msg.GetErrMsg("VOT_ERR_06", []string{registeredElection}))
 	}
@@ -203,6 +207,7 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 
 // args[0] : SSN
 // args[1] : electionType
+// args[2] : candidate
 func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args []string) pb.Response {
 	if len(args) != 2 {
 		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"registerVoter", "2"}))
@@ -311,6 +316,133 @@ func (s *VotingChaincode) getUser(stub shim.ChaincodeStubInterface, args []strin
 	}
 
 	return shim.Success(userAsBytes)
+
+}
+
+// args[0] : ssn
+// args[1] : election type
+// args[2] : candidate pub key
+func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 3 {
+		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"vote", "3"}))
+	}
+
+	todayDate := string(time.Now().UTC().Format("2006/01/02"))
+
+	voterSSN := args[0]
+	electionType := args[1]
+	candidatePubKey := args[2]
+
+	election, err := u.FindCompositeKey(stub, c.ELECTION, []string{electionType})
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
+	if election == "" {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_15", []string{electionType}))
+	}
+
+	_, keyParts, err := stub.SplitCompositeKey(election)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
+	}
+
+	isElectionPeriod := u.IsWithinRange(todayDate, keyParts[1], keyParts[2], "2006/01/02")
+	if isElectionPeriod != true {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_13", []string{todayDate, electionType, fmt.Sprint(keyParts[1] + "-" + keyParts[2])}))
+	}
+
+	found, voterPubKey := u.FindUserBySSN(stub, voterSSN)
+	if !found {
+		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{voterSSN}))
+	}
+
+	voterAsBytes, err := stub.GetState(voterPubKey)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_10", []string{voterSSN, err.Error()}))
+	}
+
+	voter := User{}
+	err = json.Unmarshal(voterAsBytes, &voter)
+
+	if err != nil {
+		return shim.Error("Failed to unmarshal voter")
+	}
+
+	hasVoted := strings.Contains(voter.Election, c.VOTED)
+	if hasVoted == true {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_14", []string{voterSSN}))
+	}
+
+	isRegistered := strings.Contains(voter.Election, c.REGISTERED)
+	if isRegistered != true {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_11", []string{"Not Registered"}))
+	}
+
+	isEligibleToVote := strings.Split(voter.Election, c.SEPARATOR)
+	if isEligibleToVote[6] != "true" {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_11", []string{"Not Eligible"}))
+	}
+
+	voterAge := isEligibleToVote[5]
+
+	candidateAsBytes, err := stub.GetState(candidatePubKey)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_10", []string{voterSSN, err.Error()}))
+	}
+
+	candidate := User{}
+	json.Unmarshal(candidateAsBytes, &candidate)
+
+	isCandidate := strings.Split(candidate.Election, c.SEPARATOR)
+	if isCandidate[4] != "true" {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_12", []string{candidatePubKey, "Not Registered"}))
+	}
+
+	if candidate.SSN == voter.SSN {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_12", []string{candidatePubKey, fmt.Sprint("Same Voter " + voterSSN + " and Candidate " + candidate.SSN)}))
+	}
+
+	_, err = s.callOtherCC(stub, c.CCNAME, c.CHANNELID, []string{voter.SSN, candidatePubKey, electionType, todayDate})
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_17", []string{c.CCNAME, err.Error()}))
+	}
+
+	voter.Election = strings.Replace(voter.Election, c.REGISTERED, c.VOTED, -1)
+
+	voterAsBytes, _ = json.Marshal(voter)
+
+	err = stub.PutState(voterPubKey, voterAsBytes)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_09", []string{voterPubKey, err.Error()}))
+	}
+
+	vote := Vote{
+		voterSSN,
+		voter.FirstName,
+		voter.LastName,
+		voterAge,
+		candidatePubKey,
+		todayDate,
+		electionType,
+		stub.GetTxID()}
+
+	voteJSON, _ := json.Marshal(vote)
+
+	return shim.Success(voteJSON)
+}
+
+func (s *VotingChaincode) callOtherCC(stub shim.ChaincodeStubInterface, ccName string, channelID string, args []string) ([]byte, error) {
+
+	ccInvokeArgs := u.ArrayToChaincodeArgs(args)
+
+	ccInvoke := stub.InvokeChaincode(ccName, ccInvokeArgs, channelID)
+
+	if ccInvoke.Status != shim.OK {
+		return []byte{0x00}, errors.New(msg.GetErrMsg("COM_ERR_17", []string{ccName, ccInvoke.Message}))
+	}
+
+	return ccInvoke.Payload, nil
 }
 
 // args[0] : ssn

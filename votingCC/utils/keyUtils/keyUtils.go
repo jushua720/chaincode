@@ -55,7 +55,7 @@ func IsWithinRange(dateToCheck, startDate, endDate, dateFormat string) bool {
 
 func FindCompositeKey(stub shim.ChaincodeStubInterface, objType string, args []string) (string, error) {
 
-	var foundKey string
+	var foundKeys string
 
 	keySearchIterator, err := stub.GetStateByPartialCompositeKey(objType, args)
 	if err != nil {
@@ -74,10 +74,10 @@ func FindCompositeKey(stub shim.ChaincodeStubInterface, objType string, args []s
 			return "", errors.New(msg.GetErrMsg("COM_ERR_06", []string{err.Error()}))
 		}
 
-		foundKey = keyRange.Key
+		foundKeys = keyRange.Key
 	}
 
-	return foundKey, nil
+	return foundKeys, nil
 
 }
 

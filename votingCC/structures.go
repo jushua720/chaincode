@@ -4,7 +4,7 @@ type VotingChaincode struct {
 }
 
 type User struct {
-	SSN              string `json:"SocalSecurityNumber"`
+	SSN              string `json:"SSN"`
 	PublicKey        string `json:"PublicKey"`
 	FirstName        string `json:"FirstName"`
 	LastName         string `json:"LastName"`
@@ -41,7 +41,7 @@ type NewUser struct {
 }
 
 type NewElection struct {
-	ElectionType string `json:"ElectionType`
+	ElectionType string `json:"ElectionType"`
 	ElectionID   string `json:"ElectionID"`
 	StartDate    string `json:"StartDate"`
 	EndDate      string `json:"EndDate"`
@@ -64,13 +64,24 @@ type NewVoter struct {
 	LastName       string `json:"LastName"`
 	DateOfBirth    string `json:"DateOfBirth"`
 	Age            string `json:"Age"`
-	Eligibility    bool   `json:"EligibilityToVote"`
+	Eligibility    bool   `json:"Eligibility"`
 	Candidate      bool   `json:"Candidate"`
 	ElectionType   string `json:"ElectionType"`
-	ElectionPeriod string `json"ElectionPeriod"`
+	ElectionPeriod string `json:"ElectionPeriod"`
+}
+
+type Vote struct {
+	VoterSSN     string `json:"VoterSSN"`
+	FirstName    string `json:"FirstName"`
+	LastName     string `json:"LastName"`
+	Age          string `json:"Age"`
+	Candidate    string `json:"Candidate"`
+	ElectionDate string `json:"ElectionDate"`
+	ElectionType string `json:"ElectionType"`
+	TxID         string `json:"TxID"`
 }
 
 type Result struct {
-	Res string `json:"Result"`
-	Msg string `json:"Message"`
+	Result  string `json:"Result"`
+	Message string `json:"Message"`
 }

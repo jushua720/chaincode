@@ -51,6 +51,8 @@ Function List :
 3	| registerCandidate
 4	| registerVoter
 5	| getUser
+6   | vote
+7   | callCC
 */
 
 func TestCCFunctions(test *testing.T) {
@@ -79,6 +81,7 @@ func TestCCFunctions(test *testing.T) {
 	}
 
 	fmt.Println("= Get User By Key =")
+
 	for i := 0; i < len(userSSNs); i++ {
 		Invoke(test, stub, "getUser", "USERKEY", userKeys[i])
 	}
@@ -94,5 +97,11 @@ func TestCCFunctions(test *testing.T) {
 
 	fmt.Println("= Register Voter =")
 	Invoke(test, stub, "registerVoter", userSSNs[1], "primary")
+
+	fmt.Println("= Register Voter Candidate Case =")
+	Invoke(test, stub, "registerVoter", userSSNs[0], "primary")
+
+	fmt.Println("= Vote =")
+	Invoke(test, stub, "vote", userSSNs[1], "primary", userKeys[1])
 
 }
