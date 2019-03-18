@@ -51,8 +51,6 @@ Function List :
 3	| registerCandidate
 4	| registerVoter
 5	| getUser
-6   | vote
-7   | callCC
 */
 
 func TestCCFunctions(test *testing.T) {

@@ -49,6 +49,8 @@ var errCodeMap = map[string]string{
 	"VOT_ERR_13": "%s Not \"%s\" Election Period : %s",
 	"VOT_ERR_14": "%s Has Already Voted",
 	"VOT_ERR_15": "Election \"%s\" Not Exist",
+	"VOT_ERR_16": "Invalid Voting Method : %s",
+	"VOT_ERR_17": "Election \"%s\" is Not Over: %s , %s ",
 }
 
 func GetErrMsgParams(arr []string) []interface{} {

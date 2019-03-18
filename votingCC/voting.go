@@ -29,7 +29,6 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	if function == "registerUser" {
 		return s.registerUser(stub, args)
-
 	} else if function == "registerElection" {
 		return s.registerElection(stub, args)
 	} else if function == "registerCandidate" {
@@ -42,8 +41,14 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	} else if function == "getUserVotingHistory" {
 		return s.getUserVotingHistory(stub, args)
+	} else if function == "getAllUsers" {
+		return s.getAllUsers(stub, args)
+
 	} else if function == "vote" {
 		return s.vote(stub, args)
+
+	} else if function == "countVotes" {
+		return s.countVotes(stub, args)
 	}
 
 	return shim.Error(msg.GetErrMsg("COM_ERR_11", []string{function}))
@@ -108,7 +113,6 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 	}
 
 	electionType := args[0]
-
 	electionID := args[1]
 	startDate := args[2]
 	endDate := args[3]
@@ -403,7 +407,7 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 		return shim.Error(msg.GetErrMsg("VOT_ERR_12", []string{candidatePubKey, fmt.Sprint("Same Voter " + voterSSN + " and Candidate " + candidate.SSN)}))
 	}
 
-	_, err = s.callOtherCC(stub, c.CCNAME, c.CHANNELID, []string{voter.SSN, candidatePubKey, electionType, todayDate})
+	_, err = s.callOtherCC(stub, c.CCNAME, c.CHANNELID, []string{"giveVote", voter.SSN, candidatePubKey, electionType, todayDate})
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_17", []string{c.CCNAME, err.Error()}))
 	}
@@ -478,6 +482,93 @@ func (s *VotingChaincode) getUserVotingHistory(stub shim.ChaincodeStubInterface,
 	historyAsBytes, _ := json.Marshal(&history)
 
 	return shim.Success(historyAsBytes)
+}
+
+// @notice demonstrate pagination
+// args[0] : bookmark
+// args[1] : page size
+func (s *VotingChaincode) getAllUsers(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 2 {
+		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"getAllUsers", "2"}))
+	}
+
+	wallets := ""
+	separator := " ! "
+	bookmark := args[0]
+
+	pageSize, err := strconv.ParseInt(args[1], 10, 32)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
+	dataIterator, metadata, err := stub.GetStateByRangeWithPagination("", "", int32(pageSize), bookmark)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer dataIterator.Close()
+
+	logger.Info("MetaData ", metadata)
+
+	for dataIterator.HasNext() {
+		key, err := dataIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		logger.Info("Found wallet ", key.Key)
+
+		wallets = fmt.Sprint(wallets + separator + key.Key)
+
+		logger.Info("wallets", wallets)
+	}
+
+	return shim.Success([]byte(wallets))
+
+}
+
+// args[0] : voting method
+// args[1] : election type
+func (s *VotingChaincode) countVotes(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	if len(args) != 2 {
+		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"countVotes", "2"}))
+	}
+
+	todayDate := string(time.Now().UTC().Format("2006/01/02"))
+
+	method := args[0]
+	electionType := args[1]
+
+	if method != c.PLURALITY && method != c.BORDA && method != c.ELIMINATION {
+		return shim.Error(msg.GetErrMsg("COM_ERR_16", []string{method}))
+	}
+
+	election, err := u.FindCompositeKey(stub, c.ELECTION, []string{electionType})
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+
+	if election == "" {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_15", []string{electionType}))
+	}
+
+	_, keyParts, err := stub.SplitCompositeKey(election)
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
+	}
+
+	electionIsNotOver := u.IsWithinRange(todayDate, keyParts[1], keyParts[2], "2006/01/02")
+	if !electionIsNotOver {
+		return shim.Error(msg.GetErrMsg("VOT_ERR_17", []string{electionType, fmt.Sprint(keyParts[1] + "-" + keyParts[2]), todayDate}))
+	}
+
+	votingRes, err := s.callOtherCC(stub, c.CCNAME, c.CHANNELID, []string{"getVotingResults", electionType})
+	if err != nil {
+		return shim.Error(msg.GetErrMsg("COM_ERR_17", []string{c.CCNAME, err.Error()}))
+	}
+
+	fmt.Println(votingRes)
+
+	return shim.Success(nil)
 }
 
 func main() {

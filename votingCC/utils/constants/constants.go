@@ -32,6 +32,11 @@ const (
 	CHANNELID = "mychannel"
 )
 
+const (
+	PLURALITY   = "plurality"
+	BORDA       = "borda"
+	ELIMINATION = "elimination"
+)
 const SEPARATOR = "-"
 
 const Base58Table = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
