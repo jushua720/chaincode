@@ -85,3 +85,6 @@ type Result struct {
 	Result  string `json:"Result"`
 	Message string `json:"Message"`
 }
+
+type ElectChaincode struct {
+}

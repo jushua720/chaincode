@@ -9,10 +9,11 @@ const (
 
 // Composite Key Type
 const (
-	SSN       = "ssn"
-	SSNKEY    = "ssn~publicKey"
-	ELECTION  = "electionType~startDate~endDate~electionID"
-	CANDIDATE = "electionType~ssn"
+	SSN           = "ssn"
+	SSNKEY        = "ssn~publicKey"
+	ELECTION      = "electionType~startDate~endDate~electionID"
+	CANDIDATE     = "electionType~ssn"
+	VOTING_CHOICE = "electionType~candidate~date~ssn"
 )
 
 // User Query Type
@@ -26,7 +27,7 @@ const (
 	VOTED      = "voted"
 )
 
-// cc
+// elect_cc
 const (
 	CCNAME    = "elect_cc"
 	CHANNELID = "mychannel"

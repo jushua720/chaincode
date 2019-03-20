@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"./utils/elect_cc"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
@@ -42,6 +43,16 @@ func Invoke(test *testing.T, stub *shim.MockStub, function string, args ...strin
 		test.FailNow()
 	}
 	return result.Payload
+}
+
+// @note: to test rename packages for elect.go and structures.go in elect_cc folder
+func TestInvokeElectCC(test *testing.T) {
+
+	stub := Init(test)
+	stub.Invokables["elect_cc"] = shim.NewMockStub("elect_cc", new(elect_cc.ElectChaincode))
+
+	Invoke(test, stub.Invokables["elect_cc"], "giveVote", "voter_ssn", "candidate", "electionType", "todayDate")
+
 }
 
 /*
@@ -102,4 +113,8 @@ func TestCCFunctions(test *testing.T) {
 	fmt.Println("= Vote =")
 	Invoke(test, stub, "vote", userSSNs[1], "primary", userKeys[1])
 
+	fmt.Println("= Get User Info After Election =")
+	Invoke(test, stub, "getUser", "identity", userSSNs[1])
+
+	// @notice unit test for key history not implemented
 }

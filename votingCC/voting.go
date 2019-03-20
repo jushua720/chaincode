@@ -1,5 +1,9 @@
 package main
 
+// @ATTENTION: pri zapuske byfn dluja testirovanija:
+// smenit na prometeus inace ne zapustitsuja t.k pir ne udet castuju graphite seti
+// i naoborot
+
 import (
 	"encoding/json"
 	"errors"
@@ -16,6 +20,15 @@ import (
 	msg "./utils/msg"
 )
 
+// @dev
+// @notice
+// @param
+// @return
+
+/* @task : dokoncit shifrovanije
+
+
+ */
 var logger = shim.NewLogger("voting_cc")
 
 func (s *VotingChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
@@ -23,12 +36,20 @@ func (s *VotingChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	return shim.Success(nil)
 }
 
+// @dev: date Format v konstanty
+// @dev: init - access control
+
+// @dev: when register election - access control
+// @check: structurre json name capitalized
+
 func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	function, args := stub.GetFunctionAndParameters()
 
 	if function == "registerUser" {
 		return s.registerUser(stub, args)
+
+		// @notice: function name
 	} else if function == "registerElection" {
 		return s.registerElection(stub, args)
 	} else if function == "registerCandidate" {
@@ -39,11 +60,13 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 	} else if function == "getUser" {
 		return s.getUser(stub, args)
 
+		// @notice: getElectionHistory
 	} else if function == "getUserVotingHistory" {
 		return s.getUserVotingHistory(stub, args)
 	} else if function == "getAllUsers" {
 		return s.getAllUsers(stub, args)
 
+		// @notice : function name
 	} else if function == "vote" {
 		return s.vote(stub, args)
 
@@ -53,6 +76,14 @@ func (s *VotingChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 	return shim.Error(msg.GetErrMsg("COM_ERR_11", []string{function}))
 }
+
+// @dev : vote to separate cc
+
+// @notice: concurrency problem demonstration
+
+// @dev : get user correct parameters naming
+
+// @param: middele name - omit if none
 
 // args[0] : SSN
 // args[1] : FirstName
@@ -84,6 +115,8 @@ func (s *VotingChaincode) registerUser(stub shim.ChaincodeStubInterface, args []
 		return shim.Error(msg.GetErrMsg("VOT_ERR_03", []string{err.Error()}))
 	}
 
+	// @notice: combine SSN + public Key
+	/// @notice: voting choice - here?
 	userAsBytes, _ := u.MarshalData(fmt.Sprintf(`{"SSN": "%s", "PublicKey":"%s","FirstName":"%s","LastName":"%s","DateOfBirth":"%s","Gender":"%s","Election":"%s","RegistrationDate":"%s"}`,
 		ssn, pubKey, args[1], args[2], args[3], gender, "", registrationDate), User{})
 
@@ -92,12 +125,14 @@ func (s *VotingChaincode) registerUser(stub shim.ChaincodeStubInterface, args []
 		return shim.Error(msg.GetErrMsg("COM_ERR_09", []string{pubKey, err.Error()}))
 	}
 
+	// @change: SSNKey -> delete: excessive data
+
 	err = u.CreateCompKey(stub, c.SSN, []string{c.SSNKEY, ssn, pubKey})
 	if err != nil {
 		return shim.Error(err.Error())
 	}
 
-	result, _ := u.MarshalData(fmt.Sprintf(`{"ssn": "%s", "PublicKey":"%s","PrivateKey":"%s","RegistrationDAte":"%s"}`, ssn, pubKey, privKey, registrationDate), NewUser{})
+	result, _ := u.MarshalData(fmt.Sprintf(`{"ssn": "%s", "PublicKey":"%s","PrivateKey":"%s","RegistrationDate":"%s"}`, ssn, pubKey, privKey, registrationDate), NewUser{})
 
 	return shim.Success(result)
 }
@@ -112,7 +147,11 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"registerElection", "4"}))
 	}
 
+	// @dev: initialize election [ put state into Election struct] if one was not created
+
 	electionType := args[0]
+
+	// @dev electionID validation
 	electionID := args[1]
 	startDate := args[2]
 	endDate := args[3]
@@ -121,11 +160,16 @@ func (s *VotingChaincode) registerElection(stub shim.ChaincodeStubInterface, arg
 		return shim.Error(msg.GetErrMsg("VOT_ERR_04", []string{electionType}))
 	}
 
+	// @dev: + certain amount of dates
 	isValid := u.ValidateElectionPeriod(startDate, endDate)
 	if isValid != true {
 		return shim.Error(msg.GetErrMsg("VOT_ERR_05", []string{startDate, endDate}))
 	}
+	// @dev : vote contract deploy
 
+	// @dev !!!! check if election already registered
+
+	// @dev: registered elections = how many can be registered
 	registeredElection, err := u.FindCompositeKey(stub, c.ELECTION, []string{electionType})
 	if registeredElection != "" {
 		return shim.Error(msg.GetErrMsg("VOT_ERR_06", []string{registeredElection}))
@@ -178,6 +222,8 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{ssn}))
 	}
 
+	// @dev - check if registrationPeriod is open
+
 	userAsBytes, err := stub.GetState(userPubKey)
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_10", []string{userPubKey, err.Error()}))
@@ -190,11 +236,14 @@ func (s *VotingChaincode) registerCandidate(stub shim.ChaincodeStubInterface, ar
 		return shim.Error(msg.GetErrMsg("", []string{userPubKey, user.PublicKey}))
 	}
 
+	// @dev check candidate age
+
 	err = u.CreateCompKey(stub, c.CANDIDATE, []string{electionType, ssn})
 	if err != nil {
 		return shim.Error(err.Error())
 	}
 
+	// @optimize
 	_, keyParts, err := stub.SplitCompositeKey(election)
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
@@ -217,6 +266,10 @@ func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args [
 		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"registerVoter", "2"}))
 	}
 
+	// @dev: candidate registration Number
+	// @dev: polling place + time + optimization: use comp key
+
+	// @dev access control
 	var isCandidate bool
 	ssn := args[0]
 	electionType := args[1]
@@ -239,10 +292,13 @@ func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args [
 		return shim.Error(msg.GetErrMsg("VOT_ERR_07", []string{electionType}))
 	}
 
+	// @optimize
 	_, keyParts, err := stub.SplitCompositeKey(election)
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{election}))
 	}
+
+	// vstavit v pravilnoje mesto
 
 	electionStartDate := keyParts[1]
 	electionEndDate := keyParts[2]
@@ -263,6 +319,13 @@ func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args [
 	if candidateKeyAsBytes != nil {
 		isCandidate = true
 	}
+
+	// @dev if already registered check:
+
+	// if substring found
+	// Registered/Voted-ElectionType-StartDate-EndDate
+
+	// Registered/Voted-ElectionType-StartDate-EndDate-Candidate/Not-Age-isEligible-Place-Time
 
 	electionInfo := fmt.Sprintf(c.REGISTERED +
 		c.SEPARATOR + electionType + c.SEPARATOR + electionStartDate +
@@ -292,6 +355,8 @@ func (s *VotingChaincode) registerVoter(stub shim.ChaincodeStubInterface, args [
 	return shim.Success(newVoterJSON)
 }
 
+// @dev : ctobi poruadok argumentov bil stejni
+
 // args[0]: search criteria [identity (ssn) / publickey]
 // args[1]: ssn (national id)/ pub Key
 func (s *VotingChaincode) getUser(stub shim.ChaincodeStubInterface, args []string) pb.Response {
@@ -303,6 +368,7 @@ func (s *VotingChaincode) getUser(stub shim.ChaincodeStubInterface, args []strin
 	queryType := args[0]
 	user := args[1]
 
+	// @dev - check match - as in function
 	if queryType != c.IDENTITY && queryType != c.USERKEY {
 		shim.Error(msg.GetErrMsg("COM_ERR_12", []string{queryType, fmt.Sprintf(c.IDENTITY + " or " + c.USERKEY)}))
 	}
@@ -330,6 +396,11 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 	if len(args) != 3 {
 		return shim.Error(msg.GetErrMsg("COM_ERR_01", []string{"vote", "3"}))
 	}
+	//@dev hardcode time formats
+
+	// @dev: add election id
+	// @dev : to distinguish candidates: DB of id...
+	// @dev: voting place mathes the one in arguments
 
 	todayDate := string(time.Now().UTC().Format("2006/01/02"))
 
@@ -345,6 +416,10 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 	if election == "" {
 		return shim.Error(msg.GetErrMsg("VOT_ERR_15", []string{electionType}))
 	}
+	// @dev : at other code places case whn key oes not exist
+
+	// @dev: add comparison with election type, just == wont work as prim or Primary budet ravno
+	// hotuja nado primary
 
 	_, keyParts, err := stub.SplitCompositeKey(election)
 	if err != nil {
@@ -412,6 +487,7 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 		return shim.Error(msg.GetErrMsg("COM_ERR_17", []string{c.CCNAME, err.Error()}))
 	}
 
+	// @dev: rename Election in Struct
 	voter.Election = strings.Replace(voter.Election, c.REGISTERED, c.VOTED, -1)
 
 	voterAsBytes, _ = json.Marshal(voter)
@@ -420,6 +496,8 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_09", []string{voterPubKey, err.Error()}))
 	}
+
+	// @dev : if already Voted
 
 	vote := Vote{
 		voterSSN,
@@ -436,7 +514,12 @@ func (s *VotingChaincode) vote(stub shim.ChaincodeStubInterface, args []string) 
 	return shim.Success(voteJSON)
 }
 
+// @dev: ssn change to pub key
+
 func (s *VotingChaincode) callOtherCC(stub shim.ChaincodeStubInterface, ccName string, channelID string, args []string) ([]byte, error) {
+
+	// @attention: real time test is needed = jak rabotajut argumenty
+	// ccArgs := []string{args}
 
 	ccInvokeArgs := u.ArrayToChaincodeArgs(args)
 
@@ -461,6 +544,8 @@ func (s *VotingChaincode) getUserVotingHistory(stub shim.ChaincodeStubInterface,
 	if !found {
 		return shim.Error(msg.GetErrMsg("COM_ERR_14", []string{ssn}))
 	}
+
+	// @dev : display right data
 
 	historyIterator, err := stub.GetHistoryForKey(userPubKey)
 	if err != nil {
@@ -517,6 +602,7 @@ func (s *VotingChaincode) getAllUsers(stub shim.ChaincodeStubInterface, args []s
 
 		logger.Info("Found wallet ", key.Key)
 
+		// key is wallet address
 		wallets = fmt.Sprint(wallets + separator + key.Key)
 
 		logger.Info("wallets", wallets)
@@ -525,6 +611,8 @@ func (s *VotingChaincode) getAllUsers(stub shim.ChaincodeStubInterface, args []s
 	return shim.Success([]byte(wallets))
 
 }
+
+// @dev - then voting method must be specified when registering election
 
 // args[0] : voting method
 // args[1] : election type
@@ -535,6 +623,7 @@ func (s *VotingChaincode) countVotes(stub shim.ChaincodeStubInterface, args []st
 
 	todayDate := string(time.Now().UTC().Format("2006/01/02"))
 
+	// @dev: as pagination is demonstrated, more args: metadata, bookmark
 	method := args[0]
 	electionType := args[1]
 
@@ -561,13 +650,26 @@ func (s *VotingChaincode) countVotes(stub shim.ChaincodeStubInterface, args []st
 		return shim.Error(msg.GetErrMsg("VOT_ERR_17", []string{electionType, fmt.Sprint(keyParts[1] + "-" + keyParts[2]), todayDate}))
 	}
 
+	// @dev : check election can be calculated votes:
+	// get comp key + check today date vs election period is over
+
 	votingRes, err := s.callOtherCC(stub, c.CCNAME, c.CHANNELID, []string{"getVotingResults", electionType})
 	if err != nil {
 		return shim.Error(msg.GetErrMsg("COM_ERR_17", []string{c.CCNAME, err.Error()}))
 	}
 
-	fmt.Println(votingRes)
+	fmt.Println("VotingResult", votingRes)
+	// votingRes write to a struct
 
+	// get voting results
+
+	// check election type correctness
+	// @dev: arg check
+
+	// @dev:
+
+	// @return: Counting method, candidate list + their votes; winner, electon type, election dates, total registered voters,
+	// total voted voters
 	return shim.Success(nil)
 }
 
