@@ -1,4 +1,4 @@
-package main
+package elect_cc
 
 type ElectChaincode struct {
 }

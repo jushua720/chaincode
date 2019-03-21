@@ -33,6 +33,7 @@ var errCodeMap = map[string]string{
 
 	"COM_ERR_18": "Invalid Argument \"%s\" : %s",
 	"COM_ERR_19": "Failed To Get History for \"%s\" : %s",
+	"COM_ERR_20": "Failed to Parse Value \"%s\" : %s",
 
 	"VOT_ERR_01": "Duplicated SSN : \"%s\"",
 	"VOT_ERR_02": "Failed to Register New User : %s",
@@ -51,6 +52,8 @@ var errCodeMap = map[string]string{
 	"VOT_ERR_15": "Election \"%s\" Not Exist",
 	"VOT_ERR_16": "Invalid Voting Method : %s",
 	"VOT_ERR_17": "Election \"%s\" is Not Over: %s , %s ",
+
+	"ELECT_ERR_01": "GetStateByPartialCompositeKeyWithPagination Failed : %s",
 }
 
 func GetErrMsgParams(arr []string) []interface{} {

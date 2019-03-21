@@ -27,7 +27,7 @@ const (
 	VOTED      = "voted"
 )
 
-// elect_cc
+// cc
 const (
 	CCNAME    = "elect_cc"
 	CHANNELID = "mychannel"
