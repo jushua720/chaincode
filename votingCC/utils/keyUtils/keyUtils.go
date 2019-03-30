@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	c "../constants"
@@ -16,7 +17,14 @@ import (
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
-func ValidateAge(dob, dateFormat, startDate, endDate string) (string, bool) {
+func ConvertToBytes(str []string) []byte {
+
+	stringByte := "\x00" + strings.Join(str, "\x20\x00")
+
+	return []byte(stringByte)
+}
+
+func ValidateAge(dob, dateFormat, startDate, endDate string, minAge int) (string, bool) {
 
 	isAdult := true
 	dateOfBirth, _ := time.Parse(dateFormat, dob)
@@ -53,9 +61,35 @@ func IsWithinRange(dateToCheck, startDate, endDate, dateFormat string) bool {
 	return false
 }
 
+func GetAllCompositeKeys(stub shim.ChaincodeStubInterface, objType string, args []string) ([]string, error) {
+	var foundKeys []string
+
+	keySearchIterator, err := stub.GetStateByPartialCompositeKey(objType, args)
+	if err != nil {
+		return []string{}, errors.New(msg.GetErrMsg("COM_ERR_04", []string{objType, err.Error()}))
+	}
+
+	defer keySearchIterator.Close()
+
+	if !keySearchIterator.HasNext() {
+		return []string{}, nil
+	}
+
+	for keySearchIterator.HasNext() {
+		keyRange, err := keySearchIterator.Next()
+		if err != nil {
+			return []string{}, errors.New(msg.GetErrMsg("COM_ERR_06", []string{err.Error()}))
+		}
+
+		foundKeys = append(foundKeys, keyRange.Key)
+	}
+
+	return foundKeys, nil
+}
+
 func FindCompositeKey(stub shim.ChaincodeStubInterface, objType string, args []string) (string, error) {
 
-	var foundKeys string
+	var foundKey string
 
 	keySearchIterator, err := stub.GetStateByPartialCompositeKey(objType, args)
 	if err != nil {
@@ -74,10 +108,10 @@ func FindCompositeKey(stub shim.ChaincodeStubInterface, objType string, args []s
 			return "", errors.New(msg.GetErrMsg("COM_ERR_06", []string{err.Error()}))
 		}
 
-		foundKeys = keyRange.Key
+		foundKey = keyRange.Key
 	}
 
-	return foundKeys, nil
+	return foundKey, nil
 
 }
 
@@ -147,7 +181,7 @@ func MarshalData(data string, dataStruct interface{}) ([]byte, error) {
 
 func FindUserBySSN(stub shim.ChaincodeStubInterface, ssn string) (bool, string) {
 
-	keyResultsIterator, err := stub.GetStateByPartialCompositeKey(c.SSN, []string{c.SSNKEY, ssn})
+	keyResultsIterator, err := stub.GetStateByPartialCompositeKey(c.SSNKEY, []string{ssn})
 	if err != nil {
 		return false, ""
 	}
@@ -157,6 +191,7 @@ func FindUserBySSN(stub shim.ChaincodeStubInterface, ssn string) (bool, string) 
 		return false, ""
 	}
 
+	// Key: "userID-userPubKey
 	var i int
 	for i = 0; keyResultsIterator.HasNext(); i++ {
 		responseRange, err := keyResultsIterator.Next()
@@ -168,7 +203,7 @@ func FindUserBySSN(stub shim.ChaincodeStubInterface, ssn string) (bool, string) 
 		if err != nil {
 			return false, ""
 		}
-		return true, keyParts[2]
+		return true, keyParts[1]
 
 	}
 
@@ -197,4 +232,18 @@ func GenerateKeys() (string, string, error) {
 	}
 
 	return keys.PrivateKey, keys.PublicKey, nil
+}
+
+func VerifyUser(key, data, R, S, x, y string) (bool, string, error) {
+
+	hash := a.GetHash(data)
+	pubKey := a.GetPubKeyFromXY(x, y)
+
+	if key != a.GenerateAccount(pubKey) {
+		return false, "", errors.New(msg.GetErrMsg("COM_ERR_21", []string{key, x, y}))
+	}
+
+	isVerified := a.Verify(pubKey, hash, R, S)
+
+	return isVerified, hash, nil
 }

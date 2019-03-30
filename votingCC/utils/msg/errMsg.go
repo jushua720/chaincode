@@ -35,6 +35,9 @@ var errCodeMap = map[string]string{
 	"COM_ERR_19": "Failed To Get History for \"%s\" : %s",
 	"COM_ERR_20": "Failed to Parse Value \"%s\" : %s",
 
+	"COM_ERR_21": "Public Keys Mismatch : %s, %s, %s",
+	"COM_ERR_22": "Failed to Verify : %s, %s",
+
 	"VOT_ERR_01": "Duplicated SSN : \"%s\"",
 	"VOT_ERR_02": "Failed to Register New User : %s",
 	"VOT_ERR_03": "Failed to Generate Keys : %s",
@@ -45,7 +48,7 @@ var errCodeMap = map[string]string{
 	"VOT_ERR_08": "Keys mismatch: \"%s\"  and  \"%s\"",
 	"VOT_ERR_09": "Candidate is already registered : \"%s\"",
 	"VOT_ERR_10": "Voter \"%s\" is already registered",
-	"VOT_ERR_11": "Not allowed to Vote : %s",
+	"VOT_ERR_11": "Not Eligible : %s",
 	"VOT_ERR_12": "Invalid Candidate \"%s\" : %s",
 	"VOT_ERR_13": "%s Not \"%s\" Election Period : %s",
 	"VOT_ERR_14": "%s Has Already Voted",

@@ -1,22 +1,18 @@
 package constants
 
-// ElectionTypes
 const (
 	PRIMARY = "primary"
 	GENERAL = "general"
 	LOCAL   = "local"
 )
 
-// Composite Key Type
 const (
-	SSN           = "ssn"
 	SSNKEY        = "ssn~publicKey"
 	ELECTION      = "electionType~startDate~endDate~electionID"
 	CANDIDATE     = "electionType~ssn"
 	VOTING_CHOICE = "electionType~candidate~date~ssn"
 )
 
-// User Query Type
 const (
 	IDENTITY = "identity"
 	USERKEY  = "userkey"
@@ -27,7 +23,11 @@ const (
 	VOTED      = "voted"
 )
 
-// cc
+const (
+	CANDIDATE_MIN_AGE = 25
+	VOTER_MIN_AGE     = 18
+)
+
 const (
 	CCNAME    = "elect_cc"
 	CHANNELID = "mychannel"

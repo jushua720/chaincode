@@ -88,6 +88,10 @@ func TestCCFunctions(test *testing.T) {
 
 	}
 
+	fmt.Println("= User SSN = ")
+	fmt.Println("User 0 SSN ", userSSNs[0])
+	fmt.Println("User 1 SSN ", userSSNs[1])
+
 	fmt.Println("= Get User By Key =")
 
 	for i := 0; i < len(userSSNs); i++ {
@@ -114,5 +118,7 @@ func TestCCFunctions(test *testing.T) {
 
 	fmt.Println("= Get User Info After Election =")
 	Invoke(test, stub, "getUser", "identity", userSSNs[1])
+
+	// @notice unit test for key history not implemented
 
 }

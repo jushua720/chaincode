@@ -1,14 +1,14 @@
 package access
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/asn1"
-	"errors"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"math/big"
 
-	c "../constants"
 	enc "github.com/btcsuite/btcutil/base58"
 )
 
@@ -17,57 +17,143 @@ type Keys struct {
 	PublicKey  string `json:"publicKey"`
 }
 
-//@note ecdsa alg key is shorter than rsa
+type Signature struct {
+	R string
+	S string
+}
+
+type PubKeyCoordinate struct {
+	X string
+	Y string
+}
 
 func GenerateKeys() (*Keys, error) {
-
 	var keys Keys
 
-	reader := rand.Reader
+	privKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	pubKey := &privKey.PublicKey
 
-	// @note bitSize : 512, 1024, 2048
-	bitSize := 512
-	key, err := rsa.GenerateKey(reader, bitSize)
-	if err != nil {
-		return &keys, errors.New(err.Error())
-	}
-
-	keys.PrivateKey, keys.PublicKey, err = encodeKeys(key, key.PublicKey)
+	keys.PrivateKey, keys.PublicKey = encodeKeys(privKey, pubKey)
 
 	return &keys, nil
 }
 
-func encodeKeys(privKey *rsa.PrivateKey, pubKey rsa.PublicKey) (string, string, error) {
+func encodeKeys(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
 
-	privateKey := b58encode(x509.MarshalPKCS1PrivateKey(privKey))
+	pubKeyEncoded := enc.Encode(elliptic.Marshal(elliptic.P256(), publicKey.X, publicKey.Y))
+	privKeyEncoded := hex.EncodeToString(privateKey.D.Bytes())
 
-	publicKeyByte, err := asn1.Marshal(pubKey)
-	if err != nil {
-		return "", "", errors.New(err.Error())
-	}
-
-	publicKey := enc.Encode(publicKeyByte)
-
-	return privateKey, publicKey, nil
+	return privKeyEncoded, pubKeyEncoded
 }
 
-func b58encode(b []byte) string {
+func GetHash(s string) string {
+	signedBytes := make([]int8, sha256.Size)
+	unsignedBytes := make([]byte, 0, len(signedBytes))
 
-	// @note : see https://en.bitcoin.it/wiki/Base58Check_encoding
+	checksum := sha256.Sum256([]byte(s))
 
-	x := new(big.Int).SetBytes(b)
-
-	r := new(big.Int)
-	m := big.NewInt(58)
-	zero := big.NewInt(0)
-	str := ""
-
-	for x.Cmp(zero) > 0 {
-		/* x, r = (x / 58, x % 58) */
-		x.QuoRem(x, m, r)
-		/* Prepend ASCII character */
-		str = string(c.Base58Table[r.Int64()]) + str
+	for i := range checksum {
+		signedBytes[i] = int8(checksum[i])
 	}
 
-	return str
+	for _, b := range signedBytes {
+		unsignedBytes = append(unsignedBytes, byte(b))
+	}
+
+	hash := enc.Encode(unsignedBytes)
+	return hash
+}
+
+func Sign(privateKey string, hash string) (*Signature, error) {
+	var signature Signature
+
+	key := getPrivateKeyFromHex(privateKey)
+	r, s, err := ecdsa.Sign(rand.Reader, key, []byte(hash))
+	if err != nil {
+		return nil, err
+	}
+	signature.R = fmt.Sprint(r)
+	signature.S = fmt.Sprint(s)
+
+	return &signature, nil
+}
+
+func getPrivateKeyFromHex(key string) *ecdsa.PrivateKey {
+	keyBytes := getBytesFromHex(key)
+
+	privKey := new(ecdsa.PrivateKey)
+	privKey.PublicKey.Curve = elliptic.P256()
+	privKey.D = new(big.Int).SetBytes(keyBytes)
+
+	return privKey
+}
+
+func getBytesFromHex(str string) []byte {
+	if len(str) > 1 {
+		if str[0:2] == "0x" || str[0:2] == "0X" {
+			str = str[2:]
+		}
+	}
+	if len(str)%2 == 1 {
+		str = "0" + str
+	}
+
+	bytes, _ := hex.DecodeString(str)
+
+	return bytes
+}
+
+func Verify(pubKey, msg, R, S string) bool {
+
+	pub := getPubKeyFromHex(pubKey)
+	return ecdsa.Verify(&pub, []byte(msg), getBigInt(R), getBigInt(S))
+}
+
+func getBigInt(val string) *big.Int {
+	bigInt := new(big.Int)
+	bigInt, ok := bigInt.SetString(val, 10)
+	if !ok {
+		return nil
+	}
+	return bigInt
+}
+
+func getPubKeyFromHex(key string) ecdsa.PublicKey {
+
+	keyBytes := enc.Decode(key)
+	x, y := elliptic.Unmarshal(elliptic.P256(), keyBytes)
+	pubKey := ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     x,
+		Y:     y,
+	}
+
+	// @notice: pubKey.X; pubKey.Y
+
+	return pubKey
+}
+
+func GetPubKeyFromXY(x, y string) string {
+
+	// @notice : when using Java generated X, Y use base 16 - not 10
+	X := new(big.Int)
+	X, ok := X.SetString(x, 10)
+	if !ok {
+		return ""
+	}
+
+	Y := new(big.Int)
+	Y, ok = Y.SetString(y, 10)
+	if !ok {
+		return ""
+	}
+
+	pubKey := enc.Encode(elliptic.Marshal(elliptic.P256(), X, Y))
+
+	return pubKey
+}
+
+func GenerateAccount(pubKey string) string {
+	keyHash := GetHash(pubKey)
+	return keyHash[len(keyHash)-40 : len(keyHash)]
 }

@@ -52,7 +52,6 @@ func (s *ElectChaincode) giveVote(stub shim.ChaincodeStubInterface, args []strin
 	return shim.Success(result)
 }
 
-// @note: demonstrate pagination
 // args[0] : electionType
 // args[1] : bookmark
 // args[2] : page size
@@ -89,19 +88,10 @@ func (s *ElectChaincode) getVotingResults(stub shim.ChaincodeStubInterface, args
 			return shim.Error(msg.GetErrMsg("COM_ERR_07", []string{err.Error()}))
 		}
 
-		fmt.Println(keyParts[1])
+		fmt.Println("keyParts usage", keyParts[0])
+
 	}
 
-	fmt.Println(metadata.Bookmark)
-
+	fmt.Println("bookmark", metadata.Bookmark)
 	return shim.Success(nil)
 }
-
-/*
-func main() {
-	err := shim.Start(new(ElectChaincode))
-	if err != nil {
-		logger.Error(err.Error())
-	}
-}
-*/

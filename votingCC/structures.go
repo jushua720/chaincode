@@ -53,6 +53,7 @@ type NewCandidate struct {
 	FirstName      string `json:"FirstName"`
 	LastName       string `json:"LastName"`
 	DateOfBirth    string `json:"DateOfBirth"`
+	Age            string `json:"Age"`
 	ElectionType   string `json:"ElectionType"`
 	ElectionPeriod string `json:"ElectionPeriod"`
 	TxID           string `json:"TxID"`
